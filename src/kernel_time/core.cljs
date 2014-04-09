@@ -36,7 +36,9 @@
     (when success (.addCallback d #(success (js->clj % :keywordize-keys true))))
     (when error (.addErrback d error))
     (.addBoth d (fn [value] (ge/unlistenByKey listener-id) (.dispose request)))
-    (mprint (str "Firing request to " url " via " method " and data - : " data-string))
+    (println (str "Firing request to " url " via " method " and data - : " data-string))
                                         ; Fire request
     (.send request url method data-string headers)
     request))
+
+(ajax request-uri "GET" "" println)
