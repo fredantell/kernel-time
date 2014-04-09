@@ -17,10 +17,11 @@
   app-state
   {:target (. js/document (getElementById "app"))})
 
-(def request-uri "http://yts.re/api/list.json?quality=3D&rating=8")
+(def yify-uri "http://yts.re/api/list.json")
 
-(defn make-a-request [uri]
-  )
+(defn generate-request-uri [baseuri quality rating]
+  (str baseuri "?quality=" quality "&rating" rating "&")
+    )
 
 (defn ajax [url method data-string success & [error headers]]
   (let [request (XhrIo.)
@@ -41,4 +42,22 @@
     (.send request url method data-string headers)
     request))
 
-(ajax request-uri "GET" "" println)
+(def built-uri
+  (generate-request-uri yify-uri "1080p" "8"))
+
+(defn test-request [call-back]
+  (ajax built-uri "GET" "" #_println call-back))
+
+#_(ajax request-uri "GET" "" println)
+
+(defn store-response [response]
+    (println "running parser fn" response)
+    (let [x (.parse window/JSON response)]
+      (println  "Parsed JSON!" x)))
+
+(println "Test 1 how to parse")
+(println "Testing how to parse2" (.parse window/JSON "{}"))
+#_(println "Test3" (.))
+(test-request store-response)
+#_(ajax (generate-request-uri yify-uri "1080p" "8") "GET" "" println)
+;; data.json
