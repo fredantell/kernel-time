@@ -1,73 +1,55 @@
 (ns kernel-time.core
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
-            [goog.events :as ge]
-            [goog.Uri]
-            [goog.net.EventType :as gevt])
-  (:import [goog.net XhrIo]
-           [goog.async Deferred]))
+            [cljs.core.async :refer [put! chan <! timeout]]))
 
 (enable-console-print!)
 
-(def app-state (atom {:text "Hello world!"}))
+(def request (js/require "request"))
+;;(def torrent-stream (js/require "torrent-stream"))
+(def peerflix (js/require "peerflix"))
+
+(def app-state (atom {:src nil}))
+
+;; get-request :: URL -> Chan Resp
+(defn get-request [url]
+  (let [ch (chan)]
+    (request url (fn [error response body]
+                   (println "We got something!!")
+                   (put! ch [error response body])))
+    ch))
+
+(def magnet "magnet:?xt=urn:btih:8C5043DF1A8FEC9F7FDDDA70617C6BB96E14E6CC&dn=game+of+thrones+s04e01+hdtv+x264+killers+ettv&tr=http%3A%2F%2Ftracker.ex.ua%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com%3A1337")
+
+(let [engine (peerflix magnet #js {:buffer (str (* 1.5 1024 1024))
+                                   :connections 100})]
+  (. js/console dir engine)
+  (. js/console dir (.-on engine))
+  (.on engine "ready" (fn []
+                        (println "Engine is ready...")
+                        (.listen (.-server engine) 8888)))
+  (.on engine "listening"
+       (fn []
+         (println "We're listening....")
+         (let [server (.-server engine)
+               href (str "http://127.0.0.1:"
+                         (.-port (.address server))
+                         "/")]
+           (update-in app-state [:src]
+                      (fn [_] href))
+           (println @app-state)))))
+
+
+(defn video-widget [data owner]
+  (reify
+    om/IRender
+    (render [this]
+      (dom/video #js {"src" (:src data) "controls" true}))))
 
 (om/root
   (fn [app owner]
-    (dom/h1 nil (:text app)))
+    (dom/div nil
+      (om/build video-widget app)))
   app-state
   {:target (. js/document (getElementById "app"))})
-
-(def yify-uri "http://yts.re/api/list.json")
-(def uri-1 "http://yts.re/api/list.json?limit=1")
-(def uri-2 "http://yts.re/api/list.json")
-(def uri-3 "http://yts.re/api/list.json")
-(def uri-4 "http://yts.re/api/list.json")
-(def uri-5 "http://yts.re/api/list.json")
-
-(defn ajax [url method data-string success & [error headers]]
-  (let [request (XhrIo.)
-        d (goog.async.Deferred.)
-        listener-id (ge/listen request gevt/COMPLETE (fn [response]
-                                                       (let [target (.-target response)
-                                                             data (if (= method "DELETE")
-                                                                    nil
-                                                                    (.getResponseJson target ))]
-                                                         (.callback d data))))]
-                                        ; Setup deferred callbacks
-    (.addErrback d  (fn [error] (.log js/console "Error on ajax: " error)))
-    (when success (.addCallback d #(success (js->clj % :keywordize-keys true))))
-    (when error (.addErrback d error))
-    (.addBoth d (fn [value] (ge/unlistenByKey listener-id) (.dispose request)))
-    (println (str "Firing request to " url " via " method " and data - : " data-string))
-                                        ; Fire request
-    (.send request url method data-string headers)
-    request))
-
-(println "Test 1")
-(println "Testing how to parse2" (type  ( js->clj (.parse js/JSON "{}"))))
-(println "Test3")
-(ajax uri-1 "GET" "" #(.dir js/console (.parse js/JSON %)))
-;; (test-request store-response)
-;; #_(ajax (generate-request-uri yify-uri "1080p" "8") "GET" "" println)
-
-
-;; #_(ajax request-uri "GET" "" println)
-
-;; (defn store-response [response]
-;;     (println "running parser fn" response)
-;;     (let [x (.parse window/JSON response)]
-;;       (println  "Parsed JSON!" x)))
-
-;; data.json
-
-
-
-
-
-;; (defn generate-request-uri [baseuri quality rating]
-;;   (str baseuri "?quality=" quality "&rating" rating "&")
-;;     )
-;; (def built-uri
-;;   (generate-request-uri yify-uri "1080p" "8"))
-;; (defn test-request [call-back]
-;; (ajax built-uri "GET" "" #_println call-back))
